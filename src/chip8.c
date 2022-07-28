@@ -1,10 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+#include <math.h>
 
 #include "glad/glad.h"
 #include "glfw/glfw3.h"
 
 #include "chip8.h"
+#include "window.h"
+#include "opcodes.h"
 
 CHIP8 chip8_init(const char* program_path) {
 	CHIP8 chip8;
@@ -44,7 +48,7 @@ CHIP8 chip8_init(const char* program_path) {
 	fread(buffer, file_length, 1, program_file);
 	fclose(program_file);
 
-
+	// Initialize memory to 0
 	for (int i = 0; i < 4096; i++) {
 		// Load the first 80 bytes with the fontset
 		if (i < 80) {
@@ -54,17 +58,25 @@ CHIP8 chip8_init(const char* program_path) {
 		}
 
 	}
-	for (int i = 0; i < file_length; i++) {
-		chip8.memory[0x1FF + i] = buffer[i];
-	}
 
+	// Load program into memory
+	for (int i = 0; i < file_length; i++) {
+		chip8.memory[0x200 + i] = buffer[i];
+	}
 	free(buffer);
+
+	// Initialize registers and stack to 0
 	for (int i = 0; i < 16; i++) {
 		chip8.registers[i] = 0;
 		chip8.stack[i] = 0;
+		chip8.keys[i] = 0;
 	}
 
-	chip8.stack_pointer = 0;
+	// Seed the random number generator at the start time of the program
+	srand(time(NULL)); 
+
+	// Initialize the rest of the values
+	chip8.stack_count = 0;
 	chip8.program_counter = 0x200;
 	chip8.index_register = 0;
 	chip8.delay_timer = 0;
@@ -74,53 +86,20 @@ CHIP8 chip8_init(const char* program_path) {
 	return chip8;
 }
 
-void disassemble(CHIP8* chip8) {
-	printf("ADDR ISTR   NME     ARG\n-------------------------\n");
-	for (unsigned int i = 0; i < chip8->program_length; i+=2) {
-		printf("%04x %02x %02x", chip8->program_counter, chip8->memory[0x1FF + i], chip8->memory[0x1FF + i + 1]);
+void tick(CHIP8* chip8, Display* display, GLFWwindow* window) {
+	if (chip8->sound_timer > 0)	
+		chip8->sound_timer--;
+	if (chip8->delay_timer > 0)
+		chip8->delay_timer--;
 
-		unsigned short full_instruction = (chip8->memory[0x1FF + i] << 4) | chip8->memory[0x1FF + i + 1];
-		unsigned char first_nibble = chip8->memory[0x1FF + i] >> 4;
-		unsigned char second_nibble = chip8->memory[0x1FF + i] & 0x0F;
-		unsigned char third_nibble = chip8->memory[0x1FF + i + 1] >> 4;
-		unsigned char fourth_nibble = chip8->memory[0x1FF + i + 1] & 0x0F;
-
-		switch(first_nibble) {
-			case 0x00:
-				if (full_instruction == 0x00E0)
-					printf(" CLS\n");
-				else
-					printf(" ----\n");
-				break;
-			case 0x01:
-				printf(" JUMP    PC, $%x%x%x\n", second_nibble, third_nibble, fourth_nibble);
-				break;
-			case 0x06:
-				printf(" SETR    r%x, #%x%x\n", second_nibble, third_nibble, fourth_nibble);
-				break;
-			case 0x07:
-				printf(" ADD     r%x, #%x%x\n", second_nibble, third_nibble, fourth_nibble);
-				break;
-			case 0x0a:
-				printf(" SETI    I, $%x%x%x \n", second_nibble, third_nibble, fourth_nibble);
-				break;
-			case 0x0d:
-				printf(" DRAW    x(%x), y(%x), h(#%x)\n", chip8->registers[second_nibble], chip8->registers[third_nibble], fourth_nibble);
-				break;
-			default:
-				printf(" ----\n");
-				break;
-		}
-		chip8->program_counter += 2;
-	}
-	chip8->program_counter = 0x1FF;
+	process_input(window, chip8);
+	unsigned short instruction = fetch_instruction(chip8);
+	decode_and_execute(window, chip8, display, instruction);
 }
 
 unsigned short fetch_instruction(CHIP8* chip8) {
 	if (chip8->program_counter <= 0xFFF) {
-		
 		unsigned short instruction = (chip8->memory[chip8->program_counter] << 8) | chip8->memory[chip8->program_counter + 1];
-		//printf("%04x\n", instruction);
 		chip8->program_counter += 2;
 		return instruction;
 	} else {
@@ -129,66 +108,143 @@ unsigned short fetch_instruction(CHIP8* chip8) {
 }
 
 void decode_and_execute(GLFWwindow* window, CHIP8* chip8, Display* display, unsigned short instruction) {
-	// Possible Parameters
+	// Possible Arguments
 	unsigned char  X   = (instruction & 0x0F00) >> 8;
 	unsigned char  Y   = (instruction & 0x00F0) >> 4;
 	unsigned char  N   = (instruction & 0x000F);
 	unsigned char  NN  = (instruction & 0x00FF);
 	unsigned short NNN = (instruction & 0x0FFF);
-
-	
-
+		
 	switch((instruction & 0xF000) >> 12) {
-		case 0x00: { // Clear (00E0)
-			if (instruction == 0x00E0)
-				display_clear(display);
-				display_texture_update(display);
-				display_draw(window, display);
-				printf("Screen cleared!\n");
-		} break;
-		case 0x01: { // Jump (1NNN)
-			chip8->program_counter = NNN - 1;
-			printf("Jumping to %04x!\n", chip8->program_counter);
-			printf("PC: %04x\n", chip8->program_counter);
-		} break;
-		case 0x06: { // Set Register (6XNN)
-			chip8->registers[X] = NN;
-			printf("Set value in register %02x to %02x\n", X, NN);
-		} break;
-		case 0x07: { // Add value to register (7XNN)
-			chip8->registers[X] += NN;
-			printf("Added value %02x to register %02x\n", NN, X);
-		} break;
-		case 0x0a: { // Set Index Register (ANNN)
-			chip8->index_register = NNN;
-			printf("Set index register to value %04x\n", NNN);
-		} break;
-		case 0x0d: { // Draw (DXYN)
-			// Wrap position
-			int x_pos = chip8->registers[X] % 64;
-			int y_pos = chip8->registers[Y] % 32;
-			chip8->registers[15] = 0;
-			
-			// Set pixels in pixel array
-			for (int i = 0; i < N; i++) {
-				unsigned char sprite_byte = chip8->memory[chip8->index_register + i - 1];
-				int x_pos = chip8->registers[X] % 64;
-				for (int j = 0; j < 8; j++) {
-					if (((sprite_byte & (0x80 >> j)) >> (7 - j)) == 1) 
-						if(display_set_pixel(display, x_pos, y_pos))
-							chip8->registers[15] = 1;
-					x_pos++;
-				}
-				y_pos++;
+		case 0x00:
+	    	if (instruction == 0x00E0) { 
+				op_00E0(chip8, display, window);
+			} else if (instruction == 0x00EE) { 
+				op_00EE(chip8);
 			}
-
-			// Update screen
-			display_texture_update(display);
-			display_draw(window, display);
-
-			printf("Drew sprite starting at (%d, %d) with a height of %02x\n", x_pos, y_pos, N);
-		} break;
-		default: {
-		} break;
+			break;
+		case 0x01:
+			op_1NNN(chip8, NNN);
+			break;
+		case 0x02:
+			op_2NNN(chip8, NNN);
+			break;
+		case 0x03:
+			op_3XNN(chip8, X, NN);
+			break;
+		case 0x04:
+			op_4XNN(chip8, X, NN);
+			break;
+		case 0x05:
+			op_5XY0(chip8, X, Y);
+			break;
+		case 0x06: 
+			op_6XNN(chip8, X, NN);
+			break;
+		case 0x07: 
+			op_7XNN(chip8, X, NN);
+			break;
+		case 0x08:
+		   	switch(N) {
+				case 0: 
+					op_8XY0(chip8, X, Y);
+					break;
+				case 1:
+					op_8XY1(chip8, X, Y);
+					break;
+				case 2:
+					op_8XY2(chip8, X, Y);
+					break;
+				case 3:
+					op_8XY3(chip8, X, Y);
+					break;
+				case 4:
+					op_8XY4(chip8, X, Y);
+					break;
+				case 5:
+					op_8XY5(chip8, X, Y);
+					break;
+				case 6:
+					op_8XY6(chip8, X);
+					break;
+				case 7:
+					op_8XY7(chip8, X, Y);
+					break;
+				case 14:
+					op_8XYE(chip8, X);
+					break;
+				default:
+					printf("Invalid opcode");
+					exit(EXIT_FAILURE);
+					break;
+		   	}
+			break;
+		case 0x09:
+			op_9XY0(chip8, X, Y);
+			break;
+		case 0x0a:
+			op_ANNN(chip8, NNN);
+			break;
+		case 0x0b:
+			op_BNNN(chip8, NNN);	
+			break;
+		case 0x0c:
+			op_CXNN(chip8, X, NN);	
+		case 0x0d:
+			op_DXYN(chip8, display, window, X, Y, N);
+			break;
+		case 0x0e:
+			switch(NN) {
+				case 0x9e:
+					op_EX9E(chip8, X);
+					break;
+				case 0xa1:
+					op_EXA1(chip8, X);
+					break;
+				default:
+					printf("Invalid opcode at %04x: %04x\n", chip8->program_counter, instruction);
+					exit(EXIT_FAILURE);
+					break;
+			}
+			break;
+		case 0x0f:
+			switch(NN) {
+				case 0x07:
+					op_FX07(chip8, X);
+					break;
+				case 0x0a:
+					op_FX0A(chip8, X);
+					break;
+				case 0x15:
+					op_FX15(chip8, X);
+					break;
+				case 0x18:
+					op_FX18(chip8, X);
+					break;
+				case 0x1e:
+					op_FX1E(chip8, X);
+					break;
+				case 0x29:
+					op_FX29(chip8, X);
+					break;
+				case 0x33:
+					op_FX33(chip8, X);
+					break;
+				case 0x55:
+					op_FX55(chip8, X);
+					break;
+				case 0x65:
+					op_FX65(chip8, X);
+					break;
+				default:
+					printf("Invalide opcode at %04x: %04x\n", chip8->program_counter, instruction);
+					exit(EXIT_FAILURE);
+					break;
+			}
+			break;
+		default:
+			printf("Invalid opcode at %04x: %04x\n", chip8->program_counter, instruction);
+			exit(EXIT_FAILURE);
+			break;
 	}
 }

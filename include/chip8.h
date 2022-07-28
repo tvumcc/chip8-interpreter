@@ -7,8 +7,9 @@ typedef struct CHIP8 {
 	unsigned char memory[4096];  // 4 kilobytes of memory, 0x1FF - 0xFFF is where the program/game is stored
     unsigned char registers[16]; // 16 8-bit registers, register VF (16) is a special type of register and is generally only used by the interpreter
     unsigned short stack[16];    // Stores subroutines called by the program
+	unsigned char keys[16];
 
-    unsigned char stack_pointer;    // Points to the top-most value of the stack
+    unsigned char stack_count;    // Stores how many subroutine addresses are on the stack
     unsigned short program_counter; // Address of the current instruction being read by the interpreter
     unsigned short index_register;  // Special 16-bit register
 
@@ -24,8 +25,7 @@ CHIP8 chip8_init(const char* program_path);
 // Loads a program from a file path into memory
 void read_program_to_memory(CHIP8* chip8, const char* program_path);
 
-// Print out a human-readable interpretation of the program loaded into the CHIP-8
-void disassemble(CHIP8* chip8);
+void tick(CHIP8* chip8, Display* display, GLFWwindow* window);
 
 // Get the instruction the program counter is pointing to
 unsigned short fetch_instruction(CHIP8* chip8);

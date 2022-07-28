@@ -142,13 +142,12 @@ void op_8XY4(CHIP8* chip8, uint8_t X, uint8_t Y) {
 
 void op_8XY5(CHIP8* chip8, uint8_t X, uint8_t Y) {
 	int result = chip8->registers[X] - chip8->registers[Y];
-	if (result < 0) {
-		chip8->registers[15] = 1;
+	chip8->registers[15] = 1;
+
+	if (chip8->registers[X] < chip8->registers[Y]) {
 		result = 256 + result;
-	} else {
 		chip8->registers[15] = 0;
 	}
-
 #ifdef CHIP8_DEBUG
 	printf("%04x: V%02x(%d) - V%02x(%d) = %d; VF(%d)\n", chip8->program_counter, X, chip8->registers[X], Y, chip8->registers[Y], result, chip8->registers[15]);
 #endif
@@ -157,33 +156,25 @@ void op_8XY5(CHIP8* chip8, uint8_t X, uint8_t Y) {
 
 void op_8XY6(CHIP8* chip8, uint8_t X) {
 	uint8_t lsb = chip8->registers[X] & 0x01;
-	chip8->registers[15] = lsb == 1 ? 1 : 0;	
 	chip8->registers[X] >>= 1;
-
-#ifdef CHIP8_DEBUG
-	printf("%04x: V%02x >>= 1; VF(%d)\n", chip8->program_counter, X, chip8->registers[15]);
-#endif
+	chip8->registers[15] = lsb == 1 ? 1 : 0;	
 }
 
 void op_8XY7(CHIP8* chip8, uint8_t X, uint8_t Y) {
 	int result = chip8->registers[Y] - chip8->registers[X];
-	if (result < 0) {
-		chip8->registers[15] = 1;
-		result = 255 - abs(result);
-	} else {
-		chip8->registers[15];
+	chip8->registers[15] = 1;
+	if (chip8->registers[Y] < chip8->registers[X]) {
+		result = 256 + result;
+		chip8->registers[15] = 0;
 	}
 
-#ifdef CHIP8_DEBUG
-	printf("%04x: V%02x(%d) - V%02x(%d) = %d; VF(%d)\n", chip8->program_counter, Y, chip8->registers[Y], X, chip8->registers[X], result, chip8->registers[15]);
-#endif
 	chip8->registers[X] = (uint8_t)(result);
 }
 
 void op_8XYE(CHIP8* chip8, uint8_t X) {
-	uint8_t msb = chip8->registers[X] & 0x80; 
-	chip8->registers[15] = msb == 1 ? 1 : 0;
+	uint8_t msb = (chip8->registers[X] & 0x80) >> 7; 
 	chip8->registers[X] <<= 1;
+	chip8->registers[15] = msb == 1 ? 1 : 0;
 
 #ifdef CHIP8_DEBUG
 	printf("%04x: V%02x >>= 1; VF(%d)\n", chip8->program_counter, X, chip8->registers[15]);
@@ -245,12 +236,14 @@ void op_DXYN(CHIP8* chip8, Display* display, GLFWwindow* window, uint8_t X, uint
 }
 
 void op_EX9E(CHIP8* chip8, uint8_t X) {
-	//if (chip8->keys[X])	
-	//	chip8->program_counter += 2;
+	if (chip8->keys[chip8->registers[X]] == 1) {
+		printf("Key detected, skipping\n");
+		chip8->program_counter += 2;
+	}
 }
 
 void op_EXA1(CHIP8* chip8, uint8_t X) {
-	if (chip8->keys[X] == 0)
+	if (chip8->keys[chip8->registers[X]] == 0)
 		chip8->program_counter += 2;
 }
 
@@ -259,7 +252,6 @@ void op_FX07(CHIP8* chip8, uint8_t X) {
 }
 
 void op_FX0A(CHIP8* chip8, uint8_t X) {
-	printf("CHECKING FOR A KEY\n");
 	for (int i = 0; i < 16; i++) {
 		if (chip8->keys[i] == 1) {
 			chip8->registers[X] = chip8->keys[i];

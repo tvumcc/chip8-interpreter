@@ -26,11 +26,6 @@ void process_input(GLFWwindow* window, CHIP8* chip8) {
 	 *		 7 8 9 E		   A S D F
 	 *		 A 0 B F           Z X C V
 	 */
-	// for (unsigned char i = 0; i < 16; i++) {
-	// 	printf("Keys: %01x(%d), ", i, chip8->keys[i]);
-	// }
-	// printf("\n");
-
 	if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
 		chip8->keys[0] = 1;
 	if (glfwGetKey(window, GLFW_KEY_X) == GLFW_RELEASE)

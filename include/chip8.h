@@ -1,6 +1,6 @@
 #ifndef CHIP8_H
 #define CHIP8_H
-#include "glfw/glfw3.h"
+struct GLFWwindow;
 #include "display.h"
 
 typedef struct CHIP8 {

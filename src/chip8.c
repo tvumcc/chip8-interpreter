@@ -121,6 +121,9 @@ void decode_and_execute(GLFWwindow* window, CHIP8* chip8, Display* display, unsi
 				op_00E0(chip8, display, window);
 			} else if (instruction == 0x00EE) { 
 				op_00EE(chip8);
+			} else {
+				printf("Invalid opcode at %04x: %04x\n", chip8->program_counter - 2, instruction);
+				exit(EXIT_FAILURE);
 			}
 			break;
 		case 0x01:
@@ -174,7 +177,7 @@ void decode_and_execute(GLFWwindow* window, CHIP8* chip8, Display* display, unsi
 					op_8XYE(chip8, X);
 					break;
 				default:
-					printf("Invalid opcode");
+					printf("Invalid opcode at %04x: %04x\n", chip8->program_counter - 2, instruction);
 					exit(EXIT_FAILURE);
 					break;
 		   	}
@@ -189,7 +192,8 @@ void decode_and_execute(GLFWwindow* window, CHIP8* chip8, Display* display, unsi
 			op_BNNN(chip8, NNN);	
 			break;
 		case 0x0c:
-			op_CXNN(chip8, X, NN);	
+			op_CXNN(chip8, X, NN);
+			break;	
 		case 0x0d:
 			op_DXYN(chip8, display, window, X, Y, N);
 			break;
@@ -202,7 +206,7 @@ void decode_and_execute(GLFWwindow* window, CHIP8* chip8, Display* display, unsi
 					op_EXA1(chip8, X);
 					break;
 				default:
-					printf("Invalid opcode at %04x: %04x\n", chip8->program_counter, instruction);
+					printf("Invalid opcode at %04x: %04x\n", chip8->program_counter - 2, instruction);
 					exit(EXIT_FAILURE);
 					break;
 			}
@@ -237,13 +241,13 @@ void decode_and_execute(GLFWwindow* window, CHIP8* chip8, Display* display, unsi
 					op_FX65(chip8, X);
 					break;
 				default:
-					printf("Invalide opcode at %04x: %04x\n", chip8->program_counter, instruction);
+					printf("Invalide opcode at %04x: %04x\n", chip8->program_counter - 2, instruction);
 					exit(EXIT_FAILURE);
 					break;
 			}
 			break;
 		default:
-			printf("Invalid opcode at %04x: %04x\n", chip8->program_counter, instruction);
+			printf("Invalid opcode at %04x: %04x\n", chip8->program_counter - 2, instruction);
 			exit(EXIT_FAILURE);
 			break;
 	}

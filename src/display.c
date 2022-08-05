@@ -2,7 +2,7 @@
 
 Display display_init() {
     // Initialize pixelArray
-    unsigned char* pixelArray = (unsigned char*)(malloc(CHIP8_WIDTH * CHIP8_HEIGHT));
+    unsigned char* pixelArray = (unsigned char*)(malloc((CHIP8_WIDTH * CHIP8_HEIGHT)));
     for (int i = 0; i < (CHIP8_WIDTH * CHIP8_HEIGHT); i++) {
         pixelArray[i] = 0x00;
     }
@@ -26,10 +26,10 @@ Display display_init() {
     
     // VBO
     float vertices[] = {
-        -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-         1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-         1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
-        -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f, 0.0f, 1.0f,
+         1.0f, -1.0f, 0.0f, 1.0f, 1.0f,
+         1.0f,  1.0f, 0.0f, 1.0f, 0.0f,
+        -1.0f,  1.0f, 0.0f, 0.0f, 0.0f,
     };
 
     glGenBuffers(1, &VBO);
@@ -127,8 +127,8 @@ void display_texture_update(Display* display) {
 }
 
 bool display_set_pixel(Display* display, int x, int y) {
-    if ((x < CHIP8_WIDTH && x >= 0) && (y >= 0 && y < CHIP8_HEIGHT)) {
-        unsigned char* pixel = &(display->pixelArray[(64 * (31 - y)) + x]);
+    // if ((x < CHIP8_WIDTH && x >= 0) && (y >= 0 && y < CHIP8_HEIGHT)) {
+        unsigned char* pixel = &(display->pixelArray[(64 * y) + x]);
         if (*pixel == 0xFF) {
             *pixel = 0x00;
             return true; // Flipped
@@ -136,9 +136,9 @@ bool display_set_pixel(Display* display, int x, int y) {
             *pixel = 0xFF;
             return false; // Did not flip
         }
-    } else {
-        return false;
-    }
+    // } else {
+    //     return false;
+    // }
 }
 
 void display_clear(Display* display) {

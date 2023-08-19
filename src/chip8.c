@@ -87,11 +87,6 @@ CHIP8 chip8_init(const char* program_path) {
 }
 
 void tick(CHIP8* chip8, Display* display, GLFWwindow* window) {
-	if (chip8->sound_timer > 0)	
-		chip8->sound_timer--;
-	if (chip8->delay_timer > 0)
-		chip8->delay_timer--;
-
 	process_input(window, chip8);
 	unsigned short instruction = fetch_instruction(chip8);
 	decode_and_execute(window, chip8, display, instruction);
